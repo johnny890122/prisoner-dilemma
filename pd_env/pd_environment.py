@@ -1,7 +1,7 @@
 import functools, random
 from copy import copy
 import numpy as np
-from typing import List, Dict
+from typing import List, Dict, Any
 import gymnasium.spaces as spaces
 from pettingzoo import ParallelEnv
 import pd_env.CONST as CONST
@@ -13,26 +13,42 @@ class PrisonerDilemmaEnvironment(ParallelEnv):
     }
 
     def __init__(self):
+        """
+        Initializes a new instance of the PDEnvironment class.
+        """
+        # Define the agents
         self.agents = [agent for agent in range(CONST.NUM_AGENTS)]
         self.agents_name_mapping = {
             agent: name for agent, name in zip(self.agents, CONST.AGENTS_NAMES)
         }
 
+        # Define the actions
         self.actions = [action for action in range(CONST.NUM_ACTIONS)]
         self.action_name_mapping = {
             action: name for action, name in zip(self.actions, CONST.ACTIONS_NAMES)
         }
 
+        # Define other attributes
         self.timestep = None
+        self.seed = None
 
-    def reset(self, seed: int=CONST.SEED, options=None):
+    def reset(self, seed: int=CONST.SEED, options: Any=None):
+        """
+        Resets the environment to its initial state.
+
+        Args:
+            seed (int, optional): The seed value for random number generation. Defaults to CONST.SEED.
+            options (any, optional): Additional options for resetting the environment. Defaults to None.
+
+        Returns:
+            tuple: A tuple containing the observations and infos after resetting the environment.
+        """
         self.timestep = 0
         self.seed = seed
 
         pairs = utils.pd_pairs(self.agents)
         actions = [None for _ in self.agents]
         payoffs = [0 for _ in self.agents]
-        
         observations = [{
             agent: (
                 agent, # self identity 
