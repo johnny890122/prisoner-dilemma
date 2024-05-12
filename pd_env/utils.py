@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from gymnasium import spaces
 import pd_env.CONST as CONST
 from typing import List, Tuple
@@ -48,3 +49,48 @@ def my_partner(agent: int, pairs: Tuple[List[int]]) -> int:
             if len(partner) == 1:
                 return int(list(partner)[0])
             return list(partner)
+
+def pretty_print_obs(observations: List[Tuple]) -> pd.DataFrame:
+    """
+    Converts a list of observations into a pandas DataFrame and returns it.
+
+    Args:
+        observations (List[Tuple]): A list of tuples representing observations. Each tuple should contain the following elements:
+            - agent: The agent's identifier.
+            - pairs: A list of tuples representing pairs of agents.
+            - actions: A dictionary mapping agents to their chosen actions.
+            - payoffs: A dictionary mapping agents to their received payoffs.
+
+    Returns:
+        pd.DataFrame: A pandas DataFrame containing the following columns:
+            - Round: The round number.
+            - Agent: The agent's identifier.
+            - Partner: The partner's identifier.
+            - Actions: The chosen actions of the agent and its partner.
+            - Rewards: The received payoffs of the agent and its partner.
+    """
+
+    lst = []
+    for i, obs in enumerate(observations):
+        agent, pairs, actions, payoffs = obs[0], obs[2], obs[3], obs[4]
+        partner = my_partner(agent, pairs)
+        try:
+            my_action = CONST.ACTIONS_NAMES[actions[agent]] 
+        except:
+            my_action = "None"
+        try:
+            partner_action = CONST.ACTIONS_NAMES[actions[partner]]
+        except:
+            partner_action = "None"
+        my_payoff, partner_payoff = payoffs[agent], payoffs[partner]
+        
+        dct = {
+            'Round': i+1,
+            'Agent': agent,
+            'Partner': partner,
+            'Actions': f"({my_action}, {partner_action})",
+            'Rewards': f"({my_payoff}, {partner_payoff})"
+        }
+        lst.append(dct)
+
+    return pd.DataFrame(lst).set_index('Round')
