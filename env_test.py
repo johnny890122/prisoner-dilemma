@@ -5,4 +5,6 @@ if __name__ == "__main__":
     print("Running test for Prisoner Dilemma Environment")
     env = PrisonerDilemmaEnvironment()
     observations, infos = env.reset()
-    # parallel_api_test(env, num_cycles=1_000_000)
+    actions = [0,0,0,0]
+    env.step(actions)
+    print(env.obeseve_all(0))

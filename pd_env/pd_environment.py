@@ -1,7 +1,7 @@
 import functools, random
 from copy import copy
 import numpy as np
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import gymnasium.spaces as spaces
 from pettingzoo import ParallelEnv
 import pd_env.CONST as CONST
@@ -31,6 +31,8 @@ class PrisonerDilemmaEnvironment(ParallelEnv):
         # Define other attributes
         self.timestep = None
         self.seed = None
+        self.observations = None
+        self.rewards = None # acuumulated payoffs
 
     def reset(self, seed: int=CONST.SEED, options: Any=None):
         """
@@ -45,31 +47,80 @@ class PrisonerDilemmaEnvironment(ParallelEnv):
         """
         self.timestep = 0
         self.seed = seed
-
-        pairs = utils.pd_pairs(self.agents)
-        actions = [None for _ in self.agents]
-        payoffs = [0 for _ in self.agents]
-        observations = [{
-            agent: (
-                agent, # self identity 
-                self.agents, # identity of each agent
-                pairs, # pairs of agents
-                actions, # actions of each agent
-                payoffs, # payoffs of each agent
-            ) for agent in self.agents
-        }]
+        self.rewards = [0 for _ in self.agents]
+        self.observations = [self.initialize_round()]
 
         # Get dummy infos. Necessary for proper parallel_to_aec conversion
         infos = {agent: self.info(agent) for agent in self.agents}
 
-        return observations, infos
+        return self.observations, infos
     
+    def observe(self, agent: int, moment: int) -> Tuple[Any]:
+            """
+            Retrieve the observation for a specific agent at a given moment.
+
+            Args:
+                agent (int): The index of the agent.
+                moment (int): The moment in time.
+
+            Returns:
+                Tuple[Any]: The observation for the specified agent at the given moment.
+            """
+            return self.observations[moment][agent]
+    
+    def observe_all(self, agent: int) -> List[Tuple[Any]]:
+            """
+            Returns a list of observations for the specified agent at each moment in time.
+
+            Args:
+                agent (int): The index of the agent.
+
+            Returns:
+                List[Tuple[Any]]: A list of observations, where each observation is a tuple.
+            """
+            return [self.observe(agent, moment) for moment in range(self.timestep+1)]
+
     def step(self, actions: List[int]):
-        # TODO: Implement the reward later
-        rewards = {a: 0 for a in self.agents}
+        """
+        Perform a step in the prisoner's dilemma environment.
+
+        Args:
+            actions (List[int]): A list of actions chosen by each agent.
+
+        Returns:
+            Tuple: A tuple containing the following elements:
+                - observations (List[List[List[int]]]): A list of observations for each agent at each timestep.
+                - rewards (List[int]): A list of accumulated rewards for each agent.
+                - terminations (Dict[int, bool]): A dictionary indicating whether each agent has terminated.
+                - truncations (Dict[int, bool]): A dictionary indicating whether each agent has been truncated.
+                - infos (Dict[int, Any]): A dictionary containing additional information for each agent.
+        """
+        
+        # Collect payoffs of current round
+        payoffs = []
+        for agent in self.agents:
+            obersevation = self.observe(agent, moment=self.timestep)
+            partner = utils.my_partner(agent, obersevation[2])
+            payoff = CONST.REWARD_MAP[
+                (actions[agent], actions[partner])
+            ]
+            payoffs.append(payoff)
+
+            # Update the current observation
+            self.observations[self.timestep][agent][3] = actions
+            self.observations[self.timestep][agent][4] = payoffs
+
+        # Update the rewards
+        for agent in self.agents:
+            self.rewards[agent] += payoffs[agent]
+
+        # Initialize a new round if the maximum number of rounds has not been reached
+        if self.timestep <= CONST.MAX_ROUNDS:
+            new_round = self.initialize_round()
+            self.observations.append(new_round)
 
         # Check termination conditions
-        terminations = {a: False for a in self.agents}
+        terminations = {agent: False for agent in self.agents}
         
         # Check truncation conditions (overwrites termination conditions)
         if self.timestep > CONST.MAX_ROUNDS:
@@ -77,12 +128,12 @@ class PrisonerDilemmaEnvironment(ParallelEnv):
         else:
             truncations = {agent: False for agent in self.agents}
 
-        self.timestep += 1
-
         # Get dummy infos (not used in this example)
         infos = {agent: self.info(agent) for agent in self.agents}
 
-        return observations, rewards, terminations, truncations, infos
+        self.timestep += 1
+        
+        return self.observations, self.rewards, terminations, truncations, infos
 
     def render(self):
         """Renders the environment."""
@@ -99,3 +150,20 @@ class PrisonerDilemmaEnvironment(ParallelEnv):
     def info(self, agent: int) -> Dict:
         info = {} # TODO: return the info
         return info
+
+    def initialize_round(self):
+        pairs = utils.pd_pairs(self.agents)
+        actions = [None for _ in self.agents]
+        payoffs = [0 for _ in self.agents]
+
+        state = {}
+        for agent in self.agents:
+            state[agent] = [
+                agent, # self identity 
+                self.agents, # identity of each agent
+                pairs, # pairs of agents
+                actions, # actions of each agent
+                payoffs, # payoffs of each agent
+            ]
+
+        return state
